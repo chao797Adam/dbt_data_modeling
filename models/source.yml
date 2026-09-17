@@ -1,0 +1,9 @@
+
+version: 2
+
+sources:
+  - name: external_source
+    catalog: data_warehouse_xc
+    schema: raw             
+    tables:
+      - name: orders
