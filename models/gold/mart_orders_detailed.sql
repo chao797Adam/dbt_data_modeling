@@ -19,6 +19,9 @@ select
     f.order_pk,
     f.order_id,
     f.order_date,
+    f.customer_id,
+    f.product_id,
+    f.region_id,
 
     c.customer_name,
     c.customer_email,
@@ -40,3 +43,4 @@ left join dim_cust c on f.customer_fk = c.customer_pk
 left join dim_prod p on f.product_fk = p.product_pk
 left join dim_reg r on f.region_fk = r.region_pk and f.country = r.country
 left join dim_dat d on f.order_date = d.date_pk
+order by 2

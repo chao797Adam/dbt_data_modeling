@@ -1,22 +1,40 @@
-{{ config(materialized = 'table', schema = 'silver') }}
+{{
+  config(
+    materialized = 'incremental',
+    unique_key = 'region_pk',
+    incremental_strategy = 'merge',
+    schema = 'silver'
+  )
+}}
 
 with
-    region_latest as (
+    source_data as (
+        select region_id, region_name, country, order_date
+        from {{ ref('stg_orders') }}
+        where
+            region_id is not null
+            {% if is_incremental() %}
+                and order_date > (
+                    select coalesce(max(_source_order_date), date('1900-01-01'))
+                    from {{ this }}
+                )
+            {% endif %}
+    ),
+
+    dedup as (
         select
-            region_id,
-            region_name,
-            country,
-            ingested_at,
-            order_date,
+            *,
             row_number() over (
                 partition by region_id, country order by order_date desc
             ) as rn
-        from {{ ref('stg_orders') }}
+        from source_data
     )
+
 select
     md5(concat(cast(region_id as string), '_', coalesce(country, ''))) as region_pk,
     region_id,
     region_name,
-    country
-from region_latest
+    country,
+    order_date as _source_order_date
+from dedup
 where rn = 1
