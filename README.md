@@ -1,13 +1,14 @@
 # Databricks & dbt Medallion Architecture (SCD Type 1)
 
+
 ## Architecture Flow
-Raw (`raw.orders`) 
-  └──> Bronze (`stg_orders` - SCD1 Incremental Merge)
-        ├──> Silver: `dim_prod` (MD5 surrogate keys, `rn = 1`)
-        ├──> Silver: `dim_cus` (MD5 surrogate keys, `rn = 1`)
-        ├──> Silver: `dim_region` (MD5 surrogate keys, `rn = 1`)
-        └──> Silver: `dim_date` (MD5 surrogate keys, `rn = 1`)
-              └──> Gold: `OBT` (One Big Table, region joined on `id + country`)
+* **Raw Layer**: `raw.orders`
+  * └── **Bronze Layer**: `stg_orders` (SCD1 Incremental Merge, `rn = 1`)
+      * ├── **Silver Layer (`dim_prod`)**: MD5 surrogate keys, `rn = 1`
+      * ├── **Silver Layer (`dim_cus`)**: MD5 surrogate keys, `rn = 1`
+      * ├── **Silver Layer (`dim_region`)**: MD5 surrogate keys, `rn = 1`
+      * └── **Silver Layer (`dim_date`)**: MD5 surrogate keys, `rn = 1`
+          * └── **Gold Layer (`OBT`)**: One Big Table (region joined on `id + country`)
 
 ## Layer Breakdown
 - **Bronze (`stg_orders`)**: Incremental merge, `unique_key='order_id'`, `ROW_NUMBER()` deduplicated.
