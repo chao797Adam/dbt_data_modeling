@@ -150,17 +150,56 @@ Both approaches produce the same result. The hand-written form gives finer contr
 
 ---
 
-## SCD Type 1 Verification
+### SCD Type 1 Verification
 
 SCD1 means an attribute change **overwrites** the old value; no history is kept. To verify it on `dim_product`:
 
-1. **Baseline**: `dbt run --full-refresh`, then check that product 201 exists exactly once:
-   ```sql
-   select count(*), max(product_name) from silver.dim_product where product_id = 201;
-   ```
-2. **Mutation**: insert a **new** order into `raw.orders` for `product_id = 201` with a changed `product_name`, and with an `order_date` on or after the current latest date (otherwise the watermark filter correctly skips it).
-3. **Incremental run**: `dbt run`
-4. **Assert**: the query from step 1 still returns `count(*) = 1`, and `product_name` now shows the new value.
+**1. Baseline.** Rebuild everything once so the tables start from a known state, then check the starting values:
+
+```bash
+dbt run --full-refresh
+```
+
+```sql
+select product_id, product_name
+from silver.dim_product
+where product_id in (201, 202, 230)
+order by product_id;
+```
+
+**2. Change the source.** Append two new orders, dated after the latest loaded `order_date` (rows dated earlier than the watermark are skipped by the incremental filter). Product 201 is renamed, and product 230 is new:
+
+```sql
+INSERT INTO data_warehouse_xc.raw.orders
+    (OrderID, OrderDate, CustomerID, CustomerName, CustomerEmail, ProductID, ProductName,
+     ProductCategory, RegionID, RegionName, Country, Quantity, UnitPrice, TotalAmount)
+VALUES
+    (1001, '2024-02-11', 101, 'Alice Johnson', 'alice@example.com', 201, 'Game Laptop', 'Electronics', 301, 'North America', 'USA', 2, 800.00, 1600.00),
+    (1002, '2024-02-12', 102, 'Bob Smith', 'bob@example.com', 230, 'Airpod', 'Electronics', 302, 'Europe', 'Germany', 1, 500.00, 500.00);
+```
+
+**3. Incremental run.** No `--full-refresh` this time:
+
+```bash
+dbt run
+```
+
+**4. Assert.** Run the query from step 1 again:
+
+| product_id | Before | After | Merge action |
+|---|---|---|---|
+| 201 | Laptop | Game Laptop | **Update**: matched on `product_pk`, name overwritten in place |
+| 202 | Smartphone | Smartphone | Unchanged: no new order, and SCD1 never deletes |
+| 230 | (none) | Airpod | **Insert**: new key, new row added |
+
+Each `product_id` still appears exactly once, which is the SCD1 guarantee. To check it across the whole table (0 rows returned means no duplicates):
+
+```sql
+select product_id, count(*) as row_count
+from silver.dim_product
+group by product_id
+having count(*) > 1;
+```
 
 For a variant that keeps history instead of overwriting, see the SCD Type 2 snapshot in the `dbt_core_tutorial` project.
 
@@ -190,6 +229,7 @@ Run with `dbt test` (or `dbt build` to run models and tests together).
   - *Late-arriving data with an older `order_date`* is skipped once the watermark has moved past that date (data arriving late on the *same* date is handled by `>=`).
 - **Undefined winner for identical `order_id` and `order_date`.** In `stg_orders`, if the same `order_id` arrives twice with the same `order_date`, there is nothing to order on, so the surviving row is arbitrary. This needs a real modification timestamp to solve.
 - **`dim_date` is a static 2024 calendar.** Orders outside that range join to `NULL` date attributes in the mart; extend the date spine to cover the data.
+- **Dimension attributes only change when a new order arrives.** The source is a single orders table with no separate master data, so a rename of product 201 is only picked up once a new order carries the new name.
 
 
 ### Possible improvements
