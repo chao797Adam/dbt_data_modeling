@@ -46,7 +46,7 @@ data_warehouse_xc.raw.orders   (source)
 | Silver | `fct_orders` | incremental (merge), partitioned by `order_date` | one row per `order_id` | Carries foreign keys to all dimensions and the measures |
 | Gold | `mart_orders_detailed` | table | one row per order | One Big Table: fact joined with all dimensions |
 
-SCD Type 1 applies to the dimension tables only. `stg_orders` and `fct_orders` use the same `merge` mechanism as an idempotent upsert (re-running never creates duplicates), but they are a staging table and a transaction fact table, not slowly changing dimensions.
+All incremental models use the same `merge` on a unique key, so the code looks alike. What makes the three dimensions (`dim_customer`, `dim_product`, `dim_region`) **SCD Type 1** is the modeling decision behind it: their attributes change over time (a product is renamed) and the design overwrites the old value instead of keeping history. For `stg_orders` and `fct_orders` the same mechanism is only an idempotent upsert: an order is an event that does not change, so re-running the load must not create duplicates.
 
 ---
 
@@ -90,6 +90,8 @@ row_number() over (
 - `order by order_date desc, order_id desc`: the higher `order_id` wins the tie, so `rn = 1` is always order 5002 and `dim_product` always shows `Desk Lamp Pro`.
 
 This assumes `order_id` increases over time. If it does not, the tie-breaker still makes the result stable, but not necessarily the most recent version.
+
+`fct_orders` and `mart_orders_detailed` do not need this step. `fct_orders` keeps the same grain as `stg_orders` (one row per order), and `stg_orders` already guarantees a unique `order_id`. The mart left-joins the fact to dimensions on unique keys, so it cannot multiply rows. The `unique` tests on the dimension keys and on `order_pk` guard these assumptions.
 
 ### Incremental loading: when and why
 
