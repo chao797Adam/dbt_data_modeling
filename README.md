@@ -75,6 +75,21 @@ row_number() over (
 
 `order_id` is the tie-breaker: two orders on the same day for the same product are resolved deterministically instead of arbitrarily.
 
+`order_id` is the tie-breaker: two orders on the same day for the same product are resolved deterministically instead of arbitrarily.
+
+**Example**: product 201 is renamed on the same day it receives two orders.
+
+| order_id | product_id | product_name | order_date |
+|---|---|---|---|
+| 5001 | 201 | Desk Lamp | 2024-03-05 |
+| 5002 | 201 | Desk Lamp Pro | 2024-03-05 |
+| 5000 | 201 | Desk Lamp | 2024-03-04 |
+
+- `order by order_date desc` only: orders 5001 and 5002 tie on `order_date`, so either one can get `rn = 1`. `dim_product` may show `Desk Lamp` or `Desk Lamp Pro`, and the result can change between runs.
+- `order by order_date desc, order_id desc`: the higher `order_id` wins the tie, so `rn = 1` is always order 5002 and `dim_product` always shows `Desk Lamp Pro`.
+
+This assumes `order_id` increases over time. If it does not, the tie-breaker still makes the result stable, but not necessarily the most recent version.
+
 ### Incremental loading: when and why
 
 | Materialization | Use when |
