@@ -9,7 +9,7 @@
 
 with
     source_data as (
-        select region_id, region_name, country, order_date
+        select region_id, region_name, country, order_date, order_id
         from {{ ref('stg_orders') }}
         where
             region_id is not null
@@ -25,7 +25,7 @@ with
         select
             *,
             row_number() over (
-                partition by region_id, country order by order_date desc
+                partition by region_id, country order by order_date desc, order_id desc
             ) as rn
         from source_data
     )

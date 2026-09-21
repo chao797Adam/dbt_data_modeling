@@ -9,7 +9,7 @@
 
 with
     source_data as (
-        select customer_id, customer_name, customer_email, order_date
+        select customer_id, customer_name, customer_email, order_date, order_id
         from {{ ref('stg_orders') }}
         where
             customer_id is not null
@@ -24,7 +24,9 @@ with
     dedup as (
         select
             *,
-            row_number() over (partition by customer_id order by order_date desc) as rn
+            row_number() over (
+                partition by customer_id order by order_date desc, order_id desc
+            ) as rn
         from source_data
     )
 
