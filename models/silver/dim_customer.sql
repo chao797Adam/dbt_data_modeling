@@ -14,7 +14,7 @@ with
         where
             customer_id is not null
             {% if is_incremental() %}
-                and order_date > (
+                and order_date >= (
                     select coalesce(max(_source_order_date), date('1900-01-01'))
                     from {{ this }}
                 )
