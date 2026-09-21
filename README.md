@@ -75,7 +75,6 @@ row_number() over (
 
 `order_id` is the tie-breaker: two orders on the same day for the same product are resolved deterministically instead of arbitrarily.
 
-`order_id` is the tie-breaker: two orders on the same day for the same product are resolved deterministically instead of arbitrarily.
 
 **Example**: product 201 is renamed on the same day it receives two orders.
 
