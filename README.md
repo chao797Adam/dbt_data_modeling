@@ -114,6 +114,40 @@ The incremental filter uses `>=`, not `>`:
 
 Rows from the latest already-loaded date are reprocessed on every run, so data that arrives later on the same day is not lost. This is safe because the `merge` on the unique key is idempotent.
 
+### Comparison with a hand-written `MERGE`
+
+The reference tutorial implements the upsert with a hand-written Databricks SQL `MERGE`. This project expresses the same logic declaratively: `incremental_strategy = 'merge'` plus a `unique_key` makes dbt generate the `MERGE` statement (roughly the equivalent of the SQL below).
+
+```sql
+MERGE INTO silver.dim_product AS t
+USING (
+    select product_id, product_name, product_category, order_date
+    from (
+        select *,
+               row_number() over (
+                   partition by product_id
+                   order by order_date desc, order_id desc
+               ) as rn
+        from bronze.stg_orders
+    )
+    where rn = 1
+) AS s
+ON t.product_id = s.product_id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;
+```
+
+| | Hand-written `MERGE` | dbt incremental `merge` |
+|---|---|---|
+| What you write | The full `MERGE` statement, per table | A `select` plus `unique_key`; dbt generates the `MERGE` |
+| First load | Separate `CREATE TABLE` step | Same model: `is_incremental()` is false on the first run and on `--full-refresh` |
+| Table names | Hard-coded (`silver.dim_product`) | `ref()` / `source()`, resolved per environment |
+| Run order | Managed by hand or by an orchestrator | Derived automatically from `ref()` dependencies |
+| Tests, docs, lineage | Separate work | Built in (`dbt test`, `dbt docs`) |
+| Full control over `WHEN MATCHED` logic | Yes (conditions, deletes, partial updates) | Limited to the strategy options dbt provides |
+
+Both approaches produce the same result. The hand-written form gives finer control over the merge conditions and is a good way to understand what happens underneath; the dbt form removes the repeated boilerplate and keeps dependencies, environments and tests in one place.
+
 ---
 
 ## SCD Type 1 Verification
