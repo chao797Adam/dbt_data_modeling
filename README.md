@@ -46,6 +46,8 @@ data_warehouse_xc.raw.orders   (source)
 | Silver | `fct_orders` | incremental (merge), partitioned by `order_date` | one row per `order_id` | Carries foreign keys to all dimensions and the measures |
 | Gold | `mart_orders_detailed` | table | one row per order | One Big Table: fact joined with all dimensions |
 
+SCD Type 1 applies to the dimension tables only. `stg_orders` and `fct_orders` use the same `merge` mechanism as an idempotent upsert (re-running never creates duplicates), but they are a staging table and a transaction fact table, not slowly changing dimensions.
+
 ---
 
 ## Key Design Decisions
@@ -150,7 +152,7 @@ Both approaches produce the same result. The hand-written form gives finer contr
 
 ---
 
-### SCD Type 1 Verification
+## SCD Type 1 Verification
 
 SCD1 means an attribute change **overwrites** the old value; no history is kept. To verify it on `dim_product`:
 
