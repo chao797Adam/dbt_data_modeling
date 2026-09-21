@@ -132,6 +132,23 @@ For a variant that keeps history instead of overwriting, see the SCD Type 2 snap
 
 ---
 
+## Data Tests
+
+| Model | Column | Tests |
+|---|---|---|
+| `dim_customer`, `dim_product`, `dim_region`, `dim_date` | `*_pk` | `unique`, `not_null` |
+| `fct_orders` | `order_pk` | `unique`, `not_null` |
+| `fct_orders` | `customer_fk`, `product_fk`, `region_fk` | `relationships` to the matching dimension key |
+| `fct_orders` | `order_date` | `relationships` to `dim_date.date_pk` |
+| `mart_orders_detailed` | `order_pk` | `unique`, `not_null` |
+| `mart_orders_detailed` | `region_name` | `not_null` |
+
+- The `unique` tests on dimension keys verify the SCD1 guarantee: one row per business key.
+- The `relationships` tests catch orphaned foreign keys, which is how gaps caused by the watermark filter would show up.
+- The `order_date` test fails if orders fall outside the `dim_date` range (currently 2024).
+
+Run with `dbt test` (or `dbt build` to run models and tests together).
+
 ## Limitations
 
 - **No `updated_at` in the source.** `order_date` is used as a proxy watermark, which has two blind spots:
@@ -139,13 +156,12 @@ For a variant that keeps history instead of overwriting, see the SCD Type 2 snap
   - *Late-arriving data with an older `order_date`* is skipped once the watermark has moved past that date (data arriving late on the *same* date is handled by `>=`).
 - **Undefined winner for identical `order_id` and `order_date`.** In `stg_orders`, if the same `order_id` arrives twice with the same `order_date`, there is nothing to order on, so the surviving row is arbitrary. This needs a real modification timestamp to solve.
 - **`dim_date` is a static 2024 calendar.** Orders outside that range join to `NULL` date attributes in the mart; extend the date spine to cover the data.
-- **No data tests yet.**
+
 
 ### Possible improvements
 
 - Add a look-back window, e.g. `max(order_date) - interval 3 days`, to catch late-arriving rows (cheap because the merge is idempotent)
 - Use a real `updated_at` or CDC feed from the source as the watermark
-- Add tests: `unique` / `not_null` on every `*_pk`, and `relationships` tests from each `fct_orders` foreign key and `order_date` to the matching dimension key; these also detect watermark gaps
 - Generate surrogate keys with a shared macro (e.g. `dbt_utils.generate_surrogate_key`) so the fact and dimension definitions cannot drift apart
 
 ---

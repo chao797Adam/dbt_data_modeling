@@ -26,6 +26,12 @@ with
             totalamount::decimal(10, 2) as total_amount,
             current_timestamp() as ingested_at
         from {{ source('external_source', 'orders') }}
+        {% if is_incremental() %}
+            where
+                orderdate::date >= (
+                    select coalesce(max(order_date), date('1900-01-01')) from {{ this }}
+                )
+        {% endif %}
     ),
 
     dedup as (

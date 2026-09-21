@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: dim_customer
+    columns:
+      - name: customer_pk
+        tests: [unique, not_null]
+
+  - name: dim_product
+    columns:
+      - name: product_pk
+        tests: [unique, not_null]
+
+  - name: dim_region
+    columns:
+      - name: region_pk
+        tests: [unique, not_null]
+
+  - name: dim_date
+    columns:
+      - name: date_pk
+        tests: [unique, not_null]
+
+  - name: fct_orders
+    columns:
+      - name: order_pk
+        tests: [unique, not_null]
+      - name: customer_fk
+        tests:
+          - relationships:
+              to: ref('dim_customer')
+              field: customer_pk
+      - name: product_fk
+        tests:
+          - relationships:
+              to: ref('dim_product')
+              field: product_pk
+      - name: region_fk
+        tests:
+          - relationships:
+              to: ref('dim_region')
+              field: region_pk
+      - name: order_date
+        tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_pk
