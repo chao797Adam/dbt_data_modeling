@@ -31,5 +31,5 @@ where
     order_id is not null
     {% if is_incremental() %}
         and order_date
-        > (select coalesce(max(order_date), date('1900-01-01')) from {{ this }})
+        >= (select coalesce(max(order_date), date('1900-01-01')) from {{ this }})
     {% endif %}
